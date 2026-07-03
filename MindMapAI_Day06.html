@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MindMap AI</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  :root{
+    --bg:#0a0b0f;--surface:#13151e;--surface2:#1a1d28;--border:#252836;
+    --accent:#c084fc;--accent2:#e879f9;--text:#f0f0f6;--muted:#5f6380;
+    --green:#4ade80;--red:#f87171;--yellow:#fbbf24;
+  }
+  html,body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;height:100%;overflow:hidden;}
+  body{display:flex;flex-direction:column;max-width:480px;margin:0 auto;}
+
+  .topbar{padding:12px 16px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+  .topbar-r1{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .logo{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;}
+  .logo-icon{width:28px;height:28px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+  .tag{background:rgba(192,132,252,0.15);color:var(--accent2);padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.4px;}
+  .dot-wrap{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted);}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--red);}
+  .dot.on{background:var(--green);}
+  .conn-row{display:flex;gap:6px;}
+  .url-in,.model-sel{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:10px;outline:none;flex:1;min-width:0;}
+  .url-in:focus,.model-sel:focus{border-color:var(--accent);}
+  .btn-xs{background:var(--accent);color:#1a0028;border:none;padding:5px 10px;border-radius:6px;font-size:10px;font-weight:700;flex-shrink:0;}
+
+  .input-bar{padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
+  .topic-in{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;font-size:13px;outline:none;font-family:inherit;}
+  .topic-in:focus{border-color:var(--accent);}
+  .gen-btn{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#1a0028;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:700;flex-shrink:0;}
+  .gen-btn:disabled{opacity:.4;}
+
+  .tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+  .tab{flex:1;padding:10px 4px;text-align:center;font-size:12px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+  .view{display:none;flex:1;flex-direction:column;overflow:hidden;}
+  .view.active{display:flex;}
+
+  /* CANVAS TAB */
+  .canvas-wrap{flex:1;overflow:hidden;position:relative;}
+  #mapCanvas{width:100%;height:100%;touch-action:none;}
+
+  /* OUTLINE TAB */
+  .scroll-area{flex:1;overflow-y:auto;padding:14px 16px 90px;-webkit-overflow-scrolling:touch;}
+  .scroll-area::-webkit-scrollbar{display:none;}
+
+  .outline-node{margin-bottom:4px;}
+  .outline-root{font-size:15px;font-weight:800;color:var(--accent2);margin-bottom:8px;}
+  .outline-branch{font-size:13px;font-weight:700;color:var(--text);margin:8px 0 4px 0;display:flex;align-items:center;gap:6px;}
+  .outline-branch::before{content:'';display:inline-block;width:10px;height:10px;background:var(--accent);border-radius:50%;flex-shrink:0;}
+  .outline-leaf{font-size:12px;color:var(--muted);padding:3px 0 3px 22px;line-height:1.5;}
+  .outline-leaf::before{content:'→ ';}
+
+  .empty-state{text-align:center;color:var(--muted);padding:50px 20px;font-size:12px;line-height:1.7;}
+  .empty-state .big{font-size:34px;margin-bottom:10px;}
+
+  /* HISTORY TAB */
+  .hist-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;}
+  .hist-title{font-size:13px;font-weight:700;margin-bottom:3px;}
+  .hist-meta{font-size:10px;color:var(--muted);}
+
+  .bottom-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--surface);border-top:1px solid var(--border);padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:100;}
+  .export-btn{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:12px;font-size:13px;font-weight:600;}
+  .clear-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:12px 16px;border-radius:12px;font-size:13px;}
+
+  .toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 18px;border-radius:20px;font-size:12px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+  .toast.show{opacity:1;}
+
+  /* expand spinner */
+  .node-spinner{position:absolute;pointer-events:none;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-r1">
+    <div class="logo"><div class="logo-icon">&#129504;</div>MindMap AI<span class="tag">OFFLINE AI</span></div>
+    <div class="dot-wrap"><div class="dot" id="dot"></div><span id="stxt">Offline</span></div>
+  </div>
+  <div class="conn-row">
+    <input class="url-in" id="ollamaUrl" value="http://localhost:11434">
+    <select class="model-sel" id="modelSel">
+      <option value="llama3.2">llama3.2</option>
+      <option value="mistral">mistral</option>
+      <option value="gemma2">gemma2</option>
+      <option value="qwen2.5">qwen2.5</option>
+    </select>
+    <button class="btn-xs" onclick="checkOllama()">Connect</button>
+  </div>
+</div>
+
+<div class="input-bar">
+  <input class="topic-in" id="topicIn" placeholder="Enter any topic... e.g. Machine Learning" onkeydown="if(event.key==='Enter')generateMap()">
+  <button class="gen-btn" id="genBtn" onclick="generateMap()">&#9889; Map</button>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('canvas')">&#127760; Visual</div>
+  <div class="tab" onclick="switchTab('outline')">&#128196; Outline</div>
+  <div class="tab" onclick="switchTab('history')">&#128338; History</div>
+</div>
+
+<div class="view active" id="view-canvas">
+  <div class="canvas-wrap">
+    <canvas id="mapCanvas"></canvas>
+  </div>
+</div>
+
+<div class="view" id="view-outline">
+  <div class="scroll-area" id="outlineArea">
+    <div class="empty-state"><div class="big">&#129504;</div>Generate a mind map<br>to see the outline here.</div>
+  </div>
+</div>
+
+<div class="view" id="view-history">
+  <div class="scroll-area" id="historyArea">
+    <div class="empty-state"><div class="big">&#128338;</div>No maps generated yet.</div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <button class="export-btn" onclick="exportOutline()">&#11015; Export Outline</button>
+  <button class="clear-btn" onclick="clearMap()">Clear</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var ollamaConnected = false;
+var currentMap = null; // {topic, branches:[{name, nodes:[str]}]}
+var history = JSON.parse(localStorage.getItem('mm_history')||'[]');
+var canvas, ctx, W, H;
+var expandingNode = null;
+
+// Layout constants
+var ROOT_R = 46, BRANCH_R = 32, LEAF_R = 22;
+var PALETTE = ['#c084fc','#e879f9','#a78bfa','#818cf8','#60a5fa','#34d399','#fbbf24','#f87171'];
+
+window.onload = function(){
+  canvas = document.getElementById('mapCanvas');
+  ctx = canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  canvas.addEventListener('touchstart', onTap, {passive:true});
+  canvas.addEventListener('click', onTap);
+  renderHistory();
+  checkOllama();
+};
+
+function resizeCanvas(){
+  var wrap = canvas.parentElement;
+  W = canvas.width = wrap.clientWidth;
+  H = canvas.height = wrap.clientHeight;
+  if(currentMap) drawMap();
+}
+
+// ---- OLLAMA ----
+async function checkOllama(){
+  try{
+    var r = await fetch(document.getElementById('ollamaUrl').value+'/api/tags');
+    if(r.ok){
+      var data = await r.json();
+      ollamaConnected = true;
+      document.getElementById('dot').className='dot on';
+      document.getElementById('stxt').textContent='Connected';
+      if(data.models&&data.models.length){
+        var sel=document.getElementById('modelSel'); sel.innerHTML='';
+        data.models.forEach(function(m){var o=document.createElement('option');o.value=m.name;o.textContent=m.name;sel.appendChild(o);});
+      }
+      showToast('Ollama connected');
+    }
+  }catch(e){ollamaConnected=false;document.getElementById('dot').className='dot';document.getElementById('stxt').textContent='Offline';}
+}
+
+async function callOllama(prompt){
+  var url=document.getElementById('ollamaUrl').value;
+  var model=document.getElementById('modelSel').value;
+  var r=await fetch(url+'/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:model,prompt:prompt,stream:false})});
+  if(!r.ok) throw new Error('Ollama error');
+  return (await r.json()).response;
+}
+
+function extractJSON(text){
+  var t=text.replace(/```json|```/g,'').trim();
+  var s=t.indexOf('{'),e=t.lastIndexOf('}');
+  if(s>=0&&e>=0) return JSON.parse(t.substring(s,e+1));
+  throw new Error('no json');
+}
+
+// ---- GENERATE ----
+async function generateMap(){
+  var topic=document.getElementById('topicIn').value.trim();
+  if(!topic){showToast('Enter a topic');return;}
+  if(!ollamaConnected){showToast('Connect to Ollama first');return;}
+  var btn=document.getElementById('genBtn');
+  btn.disabled=true; btn.textContent='Thinking...';
+
+  var prompt='Create a mind map for the topic "'+topic+'". '+
+    'Respond ONLY with valid JSON, no markdown: '+
+    '{"topic":"'+topic+'","branches":[{"name":"Branch Name","nodes":["leaf1","leaf2","leaf3"]}]}. '+
+    'Generate exactly 5 branches, each with exactly 3 leaf nodes. Be specific and insightful.';
+
+  try{
+    var raw=await callOllama(prompt);
+    var data=extractJSON(raw);
+    if(!data.branches||!data.branches.length) throw new Error('bad data');
+    currentMap=data;
+    drawMap();
+    renderOutline();
+    var entry={id:Date.now().toString(),topic:data.topic,branches:data.branches.length,date:new Date().toISOString(),data:data};
+    history.unshift(entry);
+    if(history.length>20) history=history.slice(0,20);
+    localStorage.setItem('mm_history',JSON.stringify(history));
+    renderHistory();
+    switchTab('canvas');
+    showToast('Mind map ready');
+  }catch(e){showToast('Error: '+e.message);}
+  btn.disabled=false; btn.textContent='\u26A1 Map';
+}
+
+// ---- CANVAS DRAWING ----
+function drawMap(){
+  if(!currentMap) return;
+  ctx.clearRect(0,0,W,H);
+  var cx=W/2, cy=H/2;
+  var branches=currentMap.branches;
+  var n=branches.length;
+
+  // draw root
+  drawNode(cx,cy,ROOT_R,'#1a0028',currentMap.topic,'#e879f9',18,true);
+
+  branches.forEach(function(br,i){
+    var angle=(2*Math.PI/n)*i - Math.PI/2;
+    var brDist=W>320?130:110;
+    var bx=cx+Math.cos(angle)*brDist;
+    var by=cy+Math.sin(angle)*brDist;
+    var color=PALETTE[i%PALETTE.length];
+
+    // line root->branch
+    drawLine(cx,cy,bx,by,color,2);
+    drawNode(bx,by,BRANCH_R,color+'22',br.name,color,12,false);
+
+    // leaves
+    var leaves=br.nodes||[];
+    leaves.forEach(function(leaf,j){
+      var spread=leaves.length>1?(Math.PI/3)*(j-(leaves.length-1)/2):0;
+      var leafAngle=angle+spread;
+      var leafDist=W>320?80:70;
+      var lx=bx+Math.cos(leafAngle)*leafDist;
+      var ly=by+Math.sin(leafAngle)*leafDist;
+      drawLine(bx,by,lx,ly,color+'88',1);
+      drawNode(lx,ly,LEAF_R,color+'15',leaf,color+'cc',9,false);
+    });
+  });
+
+  // store positions for tap detection
+  window._nodePos=[];
+  branches.forEach(function(br,i){
+    var angle=(2*Math.PI/n)*i-Math.PI/2;
+    var brDist=W>320?130:110;
+    var bx=cx+Math.cos(angle)*brDist;
+    var by=cy+Math.sin(angle)*brDist;
+    window._nodePos.push({x:bx,y:by,r:BRANCH_R,type:'branch',idx:i,name:br.name});
+    (br.nodes||[]).forEach(function(leaf,j){
+      var spread=(br.nodes.length>1)?(Math.PI/3)*(j-(br.nodes.length-1)/2):0;
+      var leafAngle=angle+spread;
+      var lx=bx+Math.cos(leafAngle)*(W>320?80:70);
+      var ly=by+Math.sin(leafAngle)*(W>320?80:70);
+      window._nodePos.push({x:lx,y:ly,r:LEAF_R,type:'leaf',brIdx:i,leafIdx:j,name:leaf});
+    });
+  });
+}
+
+function drawNode(x,y,r,fill,label,textColor,fontSize,glow){
+  ctx.save();
+  if(glow){ctx.shadowColor=textColor;ctx.shadowBlur=20;}
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle=fill; ctx.fill();
+  ctx.strokeStyle=textColor; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.restore();
+  // label
+  ctx.save();
+  ctx.fillStyle=textColor;
+  ctx.font='bold '+fontSize+'px Segoe UI,system-ui,sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  var words=label.split(' ');
+  var maxW=r*1.6;
+  var lines=[]; var cur='';
+  words.forEach(function(w){
+    var test=cur?cur+' '+w:w;
+    if(ctx.measureText(test).width>maxW&&cur){lines.push(cur);cur=w;}
+    else cur=test;
+  });
+  if(cur) lines.push(cur);
+  var lh=fontSize+2;
+  var startY=y-(lines.length-1)*lh/2;
+  lines.forEach(function(l,i){ctx.fillText(l,x,startY+i*lh);});
+  ctx.restore();
+}
+
+function drawLine(x1,y1,x2,y2,color,w){
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
+  ctx.strokeStyle=color;ctx.lineWidth=w;ctx.stroke();
+}
+
+// ---- TAP: EXPAND LEAF ----
+async function onTap(e){
+  if(!currentMap||!window._nodePos) return;
+  var rect=canvas.getBoundingClientRect();
+  var cx,cy;
+  if(e.touches){cx=e.touches[0].clientX-rect.left;cy=e.touches[0].clientY-rect.top;}
+  else{cx=e.clientX-rect.left;cy=e.clientY-rect.top;}
+
+  for(var i=0;i<window._nodePos.length;i++){
+    var n=window._nodePos[i];
+    var dx=cx-n.x,dy=cy-n.y;
+    if(Math.sqrt(dx*dx+dy*dy)<=n.r+4){
+      if(n.type==='leaf'){
+        await expandLeaf(n.brIdx,n.leafIdx,n.name);
+      }
+      return;
+    }
+  }
+}
+
+async function expandLeaf(brIdx,leafIdx,leafName){
+  if(!ollamaConnected){showToast('Connect Ollama to expand');return;}
+  showToast('Expanding "'+leafName.substring(0,20)+'"...');
+  var prompt='For the concept "'+leafName+'" in the context of "'+currentMap.topic+'", '+
+    'provide exactly 3 key sub-points or examples. Respond ONLY with a JSON array of 3 short strings, no markdown: ["point1","point2","point3"]';
+  try{
+    var raw=await callOllama(prompt);
+    var t=raw.replace(/```json|```/g,'').trim();
+    var s=t.indexOf('['),e=t.lastIndexOf(']');
+    if(s>=0&&e>=0){
+      var arr=JSON.parse(t.substring(s,e+1));
+      currentMap.branches[brIdx].nodes[leafIdx]={name:leafName,expanded:arr};
+      drawMapExpanded();
+      renderOutline();
+      showToast('Expanded!');
+    }
+  }catch(err){showToast('Expand failed');}
+}
+
+function drawMapExpanded(){
+  // rebuild map with expanded nodes shown as text bubbles
+  drawMap();
+  if(!currentMap) return;
+  var cx=W/2,cy=H/2;
+  var branches=currentMap.branches;
+  var n=branches.length;
+  branches.forEach(function(br,i){
+    var angle=(2*Math.PI/n)*i-Math.PI/2;
+    var brDist=W>320?130:110;
+    var bx=cx+Math.cos(angle)*brDist;
+    var by=cy+Math.sin(angle)*brDist;
+    var color=PALETTE[i%PALETTE.length];
+    (br.nodes||[]).forEach(function(leaf,j){
+      if(typeof leaf==='object'&&leaf.expanded){
+        var spread=(br.nodes.length>1)?(Math.PI/3)*(j-(br.nodes.length-1)/2):0;
+        var la=angle+spread;
+        var lx=bx+Math.cos(la)*(W>320?80:70);
+        var ly=by+Math.sin(la)*(W>320?80:70);
+        leaf.expanded.forEach(function(txt,k){
+          var subA=la+(k-1)*(Math.PI/6);
+          var sx=lx+Math.cos(subA)*55;
+          var sy=ly+Math.sin(subA)*55;
+          drawLine(lx,ly,sx,sy,color+'55',1);
+          drawNode(sx,sy,18,color+'10',txt,color+'aa',7,false);
+        });
+      }
+    });
+  });
+}
+
+// ---- OUTLINE ----
+function renderOutline(){
+  if(!currentMap){return;}
+  var html='<div class="outline-root">&#127760; '+esc(currentMap.topic)+'</div>';
+  currentMap.branches.forEach(function(br,i){
+    html+='<div class="outline-branch">'+esc(br.name)+'</div>';
+    (br.nodes||[]).forEach(function(leaf){
+      var name=typeof leaf==='object'?leaf.name:leaf;
+      html+='<div class="outline-leaf">'+esc(name)+'</div>';
+      if(typeof leaf==='object'&&leaf.expanded){
+        leaf.expanded.forEach(function(s){
+          html+='<div class="outline-leaf" style="padding-left:38px;font-size:11px;">'+esc(s)+'</div>';
+        });
+      }
+    });
+  });
+  document.getElementById('outlineArea').innerHTML=html;
+}
+
+// ---- HISTORY ----
+function renderHistory(){
+  var el=document.getElementById('historyArea');
+  if(!history.length){el.innerHTML='<div class="empty-state"><div class="big">&#128338;</div>No maps generated yet.</div>';return;}
+  el.innerHTML=history.map(function(h){
+    var d=new Date(h.date);
+    var ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+    return '<div class="hist-card" onclick="loadHistory(\''+h.id+'\')">'+
+      '<div class="hist-title">&#129504; '+esc(h.topic)+'</div>'+
+      '<div class="hist-meta">'+h.branches+' branches &middot; '+ds+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+function loadHistory(id){
+  var h=history.find(function(x){return x.id===id;});
+  if(!h) return;
+  currentMap=h.data;
+  drawMap();
+  renderOutline();
+  switchTab('canvas');
+  showToast('Loaded: '+h.topic);
+}
+
+// ---- EXPORT ----
+function exportOutline(){
+  if(!currentMap){showToast('No map to export');return;}
+  var txt=currentMap.topic+'\n\n';
+  currentMap.branches.forEach(function(br,i){
+    txt+='• '+br.name+'\n';
+    (br.nodes||[]).forEach(function(leaf){
+      var name=typeof leaf==='object'?leaf.name:leaf;
+      txt+='  → '+name+'\n';
+      if(typeof leaf==='object'&&leaf.expanded){
+        leaf.expanded.forEach(function(s){txt+='    - '+s+'\n';});
+      }
+    });
+    txt+='\n';
+  });
+  var blob=new Blob([txt],{type:'text/plain'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=currentMap.topic.replace(/\s+/g,'_')+'_mindmap.txt';
+  a.click();
+  showToast('Exported');
+}
+
+function clearMap(){
+  currentMap=null; ctx.clearRect(0,0,W,H);
+  document.getElementById('outlineArea').innerHTML='<div class="empty-state"><div class="big">&#129504;</div>Generate a mind map<br>to see the outline here.</div>';
+  document.getElementById('topicIn').value='';
+  showToast('Cleared');
+}
+
+function switchTab(name){
+  var names=['canvas','outline','history'];
+  document.querySelectorAll('.tab').forEach(function(t,i){t.classList.toggle('active',names[i]===name);});
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  document.getElementById('view-'+name).classList.add('active');
+  if(name==='canvas'&&currentMap) setTimeout(drawMap,50);
+}
+
+function esc(s){return(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2200);}
+</script>
+</body>
+</html>
